@@ -13,6 +13,10 @@ import "../interfaces/badger/IController.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
+import {IMiniChefV2} from "../interfaces/sushiswap/IMinichef.sol";
+import {IRewarder} from "../interfaces/sushiswap/IRewarder.sol";
+import {IUniswapRouterV2} from "../interfaces/uniswap/IUniswapRouterV2.sol";
+
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
@@ -29,6 +33,14 @@ contract MyStrategy is BaseStrategy {
         uint256 indexed blockNumber,
         uint256 timestamp
     );
+
+    address public constant WETH = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
+    address public constant WBTC = 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6;
+    address public constant SUSHI_TOKEN = 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a;
+
+    address public constant CHEF = 0x0769fd68dFb93167989C6f7254cd0D766Fb2841F; 
+    address public constant SUSHISWAP_ROUTER = 0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
+    address public constant LP = 0xE62Ec2e799305E0D367b0Cc3ee2CdA135bF89816; 
 
     function initialize(
         address _governance,
