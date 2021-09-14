@@ -13,12 +13,9 @@ import "../interfaces/badger/IController.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
-<<<<<<< Updated upstream
-=======
 import "../interfaces/curve/ICurve.sol";
 import "../interfaces/uniswap/IUniswapRouterV2.sol";
 
->>>>>>> Stashed changes
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
@@ -36,8 +33,6 @@ contract MyStrategy is BaseStrategy {
         uint256 timestamp
     );
 
-<<<<<<< Updated upstream
-=======
 
     address public constant wETH_TOKEN = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address public constant wBTC_TOKEN = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
@@ -49,7 +44,6 @@ contract MyStrategy is BaseStrategy {
 
     address public constant badgerTree = 0x2C798FaFd37C7DCdcAc2498e19432898Bc51376b;
 
->>>>>>> Stashed changes
     function initialize(
         address _governance,
         address _strategist,
