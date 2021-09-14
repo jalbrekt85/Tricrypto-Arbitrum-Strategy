@@ -13,6 +13,12 @@ import "../interfaces/badger/IController.sol";
 
 import {BaseStrategy} from "../deps/BaseStrategy.sol";
 
+<<<<<<< Updated upstream
+=======
+import "../interfaces/curve/ICurve.sol";
+import "../interfaces/uniswap/IUniswapRouterV2.sol";
+
+>>>>>>> Stashed changes
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
@@ -30,6 +36,20 @@ contract MyStrategy is BaseStrategy {
         uint256 timestamp
     );
 
+<<<<<<< Updated upstream
+=======
+
+    address public constant wETH_TOKEN = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address public constant wBTC_TOKEN = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
+
+    address public constant CURVE_USDBTCETH_GAUGE = 0x0; // guage ?
+    address public constant TRI_POOL = 0x960ea3e3C7FB317332d990873d354E18d7645590; // aTricrypto pool
+
+    address public constant UNISWAP_ROUTER = 0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
+
+    address public constant badgerTree = 0x2C798FaFd37C7DCdcAc2498e19432898Bc51376b;
+
+>>>>>>> Stashed changes
     function initialize(
         address _governance,
         address _strategist,
@@ -119,7 +139,9 @@ contract MyStrategy is BaseStrategy {
     /// @dev invest the amount of want
     /// @notice When this function is called, the controller has already sent want to this
     /// @notice Just get the current balance and then invest accordingly
-    function _deposit(uint256 _amount) internal override {}
+    function _deposit(uint256 _amount) internal override {
+        
+    }
 
     /// @dev utility function to withdraw everything for migration
     function _withdrawAll() internal override {}
