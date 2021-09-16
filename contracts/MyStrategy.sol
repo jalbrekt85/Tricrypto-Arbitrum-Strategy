@@ -81,7 +81,7 @@ contract MyStrategy is BaseStrategy {
 
     // @dev Specify the name of the strategy
     function getName() external pure override returns (string memory) {
-        return "Arbitrum.Curve.fi crv3crypto (TriCrypto) Strategy";
+        return "Arbitrum-Curve TriCrypto Strat";
     }
 
     // @dev Specify the version of the Strategy, for upgrades
@@ -152,6 +152,12 @@ contract MyStrategy is BaseStrategy {
         override
         returns (uint256)
     {
+        if (_amount > balanceOfPool()) {
+            _amount = balanceOfPool();
+        }
+
+        ICurveGauge(TRI_GAUGE).withdraw(_amount);
+
         return _amount;
     }
 
@@ -162,6 +168,53 @@ contract MyStrategy is BaseStrategy {
         uint256 _before = IERC20Upgradeable(want).balanceOf(address(this));
 
         // Write your code here
+        ICurveGauge(TRI_GAUGE).claim_rewards();
+
+        uint256 rewardsAmount =
+            IERC20Upgradeable(reward).balanceOf(address(this));
+
+        if (rewardsAmount == 0) {
+            return 0;
+        }
+
+        // Half perf fee is in CRV
+        uint256 sentToTree = rewardsAmount.mul(50).div(100);
+        // Process CRV rewards if existing
+        // Process fees on CRV Rewards
+        (uint256 governancePerformanceFee, uint256 strategistPerformanceFee) =
+            _processRewardsFees(sentToTree, reward);
+
+        uint256 afterFees =
+            sentToTree.sub(governancePerformanceFee).sub(
+                strategistPerformanceFee
+            );
+
+        // Transfer balance of CRV to the Badger Tree
+        IERC20Upgradeable(reward).safeTransfer(badgerTree, afterFees);
+        emit TreeDistribution(reward, afterFees, block.number, block.timestamp);
+
+        // Now we swap
+        uint256 rewardsToReinvest =
+            IERC20Upgradeable(reward).balanceOf(address(this));
+
+        // Swap CRV to wBTC and then LP into the pool
+        address[] memory path = new address[](3);
+        path[0] = reward;
+        path[1] = WETH;
+        path[2] = WBTC;
+        IUniswapRouterV2(UNISWAP_ROUTER).swapExactTokensForTokens(
+            rewardsToReinvest,
+            0,
+            path,
+            address(this),
+            now
+        );
+
+        // Add liquidity for wBTC-renBTC pool by depositing wBTC
+        ICurveStableSwap(TRI_POOL).add_liquidity(
+            [0, IERC20Upgradeable(WBTC).balanceOf(address(this)), 0],
+            0
+        );
 
         uint256 earned =
             IERC20Upgradeable(want).balanceOf(address(this)).sub(_before);
@@ -194,16 +247,12 @@ contract MyStrategy is BaseStrategy {
         return earned;
     }
 
-    // Alternative Harvest with Price received from harvester, used to avoid exessive front-running
-    function harvest(uint256 price)
-        external
-        whenNotPaused
-        returns (uint256 harvested)
-    {}
-
     /// @dev Rebalance, Compound or Pay off debt here
     function tend() external whenNotPaused {
         _onlyAuthorizedActors();
+         if (balanceOfWant() > 0) {
+            _deposit(balanceOfWant());
+        }
     }
 
     /// ===== Internal Helper Functions =====
