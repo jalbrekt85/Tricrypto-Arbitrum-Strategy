@@ -34,8 +34,8 @@ contract MyStrategy is BaseStrategy {
     );
 
 
-    address public constant wETH_TOKEN = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address public constant wBTC_TOKEN = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
+    address public constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address public constant WBTC = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
 
     address public constant CRV = 0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978;
     address public constant TRI_POOL = 0x960ea3e3C7FB317332d990873d354E18d7645590; // aTricrypto pool
