@@ -37,8 +37,9 @@ contract MyStrategy is BaseStrategy {
     address public constant wETH_TOKEN = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address public constant wBTC_TOKEN = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
 
-    address public constant CURVE_USDBTCETH_GAUGE = 0x0; // guage ?
+    address public constant CRV = 0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978;
     address public constant TRI_POOL = 0x960ea3e3C7FB317332d990873d354E18d7645590; // aTricrypto pool
+    address public constant TRI_GAUGE  = 0x97E2768e8E73511cA874545DC5Ff8067eB19B787;
 
     address public constant UNISWAP_ROUTER = 0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
 
@@ -71,14 +72,16 @@ contract MyStrategy is BaseStrategy {
         withdrawalFee = _feeConfig[2];
 
         /// @dev do one off approvals here
-        // IERC20Upgradeable(want).safeApprove(gauge, type(uint256).max);
+        IERC20Upgradeable(want).safeApprove(TRI_GAUGE, type(uint256).max);
+        IERC20Upgradeable(want).safeApprove(TRI_POOL, type(uint256).max);
+        IERC20Upgradeable(reward).safeApprove(UNISWAP_ROUTER, type(uint256).max);
     }
 
     /// ===== View Functions =====
 
     // @dev Specify the name of the strategy
     function getName() external pure override returns (string memory) {
-        return "StrategyName";
+        return "Arbitrum.Curve.fi crv3crypto (TriCrypto) Strategy";
     }
 
     // @dev Specify the version of the Strategy, for upgrades
@@ -88,7 +91,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Balance of want currently held in strategy positions
     function balanceOfPool() public view override returns (uint256) {
-        return 0;
+        return IERC20Upgradeable(TRI_GAUGE).balanceOf(address(this));
     }
 
     /// @dev Returns true if this strategy requires tending
@@ -107,6 +110,7 @@ contract MyStrategy is BaseStrategy {
         protectedTokens[0] = want;
         protectedTokens[1] = lpComponent;
         protectedTokens[2] = reward;
+        protectedTokens[4] = WBTC;
         return protectedTokens;
     }
 
@@ -134,11 +138,13 @@ contract MyStrategy is BaseStrategy {
     /// @notice When this function is called, the controller has already sent want to this
     /// @notice Just get the current balance and then invest accordingly
     function _deposit(uint256 _amount) internal override {
-        
+        ICurveGauge(TRI_GAUGE).deposit(_amount);
     }
 
     /// @dev utility function to withdraw everything for migration
-    function _withdrawAll() internal override {}
+    function _withdrawAll() internal override {
+        ICurveGauge(TRI_GAUGE).withdraw(balanceOfPool());
+    }
 
     /// @dev withdraw the specified amount of want, liquidate from lpComponent to want, paying off any necessary debt for the conversion
     function _withdrawSome(uint256 _amount)
