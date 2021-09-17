@@ -33,17 +33,20 @@ contract MyStrategy is BaseStrategy {
         uint256 timestamp
     );
 
-
     address public constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address public constant WBTC = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
 
     address public constant CRV = 0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978;
-    address public constant TRI_POOL = 0x960ea3e3C7FB317332d990873d354E18d7645590; // aTricrypto pool
-    address public constant TRI_GAUGE  = 0x97E2768e8E73511cA874545DC5Ff8067eB19B787;
+    address public constant TRI_POOL =
+        0x960ea3e3C7FB317332d990873d354E18d7645590; // aTricrypto pool
+    address public constant TRI_GAUGE =
+        0x97E2768e8E73511cA874545DC5Ff8067eB19B787;
 
-    address public constant UNISWAP_ROUTER = 0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
+    address public constant UNISWAP_ROUTER =
+        0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
 
-    address public constant badgerTree = 0x2C798FaFd37C7DCdcAc2498e19432898Bc51376b;
+    address public constant badgerTree =
+        0x2C798FaFd37C7DCdcAc2498e19432898Bc51376b;
 
     function initialize(
         address _governance,
@@ -74,7 +77,10 @@ contract MyStrategy is BaseStrategy {
         /// @dev do one off approvals here
         IERC20Upgradeable(want).safeApprove(TRI_GAUGE, type(uint256).max);
         IERC20Upgradeable(want).safeApprove(TRI_POOL, type(uint256).max);
-        IERC20Upgradeable(reward).safeApprove(UNISWAP_ROUTER, type(uint256).max);
+        IERC20Upgradeable(reward).safeApprove(
+            UNISWAP_ROUTER,
+            type(uint256).max
+        );
     }
 
     /// ===== View Functions =====
@@ -219,10 +225,6 @@ contract MyStrategy is BaseStrategy {
         uint256 earned =
             IERC20Upgradeable(want).balanceOf(address(this)).sub(_before);
 
-        /// @notice Keep this in so you get paid!
-        (uint256 governancePerformanceFee, uint256 strategistPerformanceFee) =
-            _processPerformanceFees(earned);
-
         // TODO: If you are harvesting a reward token you're not compounding
         // You probably still want to capture fees for it
         // // Process Sushi rewards if existing
@@ -250,7 +252,7 @@ contract MyStrategy is BaseStrategy {
     /// @dev Rebalance, Compound or Pay off debt here
     function tend() external whenNotPaused {
         _onlyAuthorizedActors();
-         if (balanceOfWant() > 0) {
+        if (balanceOfWant() > 0) {
             _deposit(balanceOfWant());
         }
     }
