@@ -55,7 +55,7 @@ def deployed():
     # guestList.setUserDepositCap(100000000)
     # sett.setGuestList(guestList, {"from": governance})
 
-    ## Start up Strategy
+    ## Start up Strategy
     strategy = MyStrategy.deploy({"from": deployer})
     strategy.initialize(
         BADGER_DEV_MULTISIG,
@@ -74,20 +74,30 @@ def deployed():
     lpComponent = interface.IERC20(LP_COMPONENT)
     rewardToken = interface.IERC20(REWARD_TOKEN)
 
-    ## Wire up Controller to Strart
-    ## In testing will pass, but on live it will fail
+    ## Wire up Controller to Strart
+    ## In testing will pass, but on live it will fail
     controller.approveStrategy(WANT, strategy, {"from": governance})
     controller.setStrategy(WANT, strategy, {"from": deployer})
 
+    WETH = strategy.WETH()
+    WBTC = strategy.WBTC()
+
     ## Uniswap some tokens here
-    router = interface.IUniswapRouterV2("0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506")
+    router = interface.IUniswapRouterV2(strategy.UNISWAP_ROUTER())
     router.swapExactETHForTokens(
-        0,  ## Mint out
-        ["0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", WANT],
+        0,  ## Min out
+        [WETH, WBTC],
         deployer,
         9999999999999999,
         {"from": deployer, "value": 5000000000000000000},
     )
+    
+    WBTC_TOKEN = interface.IERC20(WBTC)
+    toDeposit = WBTC_TOKEN.balanceOf(deployer)
+    WBTC_TOKEN.approve(strategy.TRI_POOL(), toDeposit, {"from": deployer})
+    ## Doing this gives us want
+    pool = interface.ICurveStableSwap(strategy.TRI_POOL())
+    pool.add_liquidity([0, toDeposit, 0], 0, {"from": deployer})
 
     return DotMap(
         deployer=deployer,
@@ -159,3 +169,7 @@ def settKeeper(vault):
 @pytest.fixture
 def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
+
+@pytest.fixture(autouse=True)
+def isolation(fn_isolation):
+    pass

@@ -1,8 +1,7 @@
 import brownie
 from brownie import *
-from helpers.constants import MaxUint256
-from helpers.SnapshotManager import SnapshotManager
-from helpers.time import days
+from helpers.constants import AddressZero, MaxUint256
+from helpers.time import hours
 
 """
   TODO: Put your tests here to prove the strat is good!
@@ -11,5 +10,5 @@ from helpers.time import days
 """
 
 
-def test_my_custom_test(deployed):
+def test_my_custom_test():
     assert True

@@ -10,22 +10,20 @@ import "../deps/@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol
 import "../deps/@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
 import "../interfaces/badger/IController.sol";
-
-import {BaseStrategy} from "../deps/BaseStrategy.sol";
-
+import "../interfaces/chainlink/AggregatorV2V3Interface.sol";
 import "../interfaces/curve/ICurve.sol";
 import "../interfaces/uniswap/IUniswapRouterV2.sol";
 
+import {BaseStrategy} from "../deps/BaseStrategy.sol";
+
+/// @title Arbitrum Curve triCrypto Strategy
+/// @author Badger DAO
+/// @notice Deposit LP Token, harvest CRV, 50% autocompound, 50% emitted via badgerTree
 contract MyStrategy is BaseStrategy {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
 
-    // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
-    address public lpComponent; // Token we provide liquidity with
-    address public reward; // Token we farm and swap to want / lpComponent
-
-    // Used to signal to the Badger Tree that rewards where sent to it
     event TreeDistribution(
         address indexed token,
         uint256 amount,
@@ -33,20 +31,30 @@ contract MyStrategy is BaseStrategy {
         uint256 timestamp
     );
 
-    address public constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address public constant WBTC = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
+    // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
+    address public lpComponent; // Token we provide liquidity with
+    address public reward; // it's CRV
 
     address public constant CRV = 0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978;
-    address public constant TRI_POOL =
-        0x960ea3e3C7FB317332d990873d354E18d7645590; // aTricrypto pool
-    address public constant TRI_GAUGE =
-        0x97E2768e8E73511cA874545DC5Ff8067eB19B787;
 
+    // Used to swap from CRV to WBTC so we can provide liquidity
+    address public constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address public constant WBTC = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
+    address public constant WBTC_PRICE_FEED = 0x6ce185860a4963106506C203335A2910413708e9;
+
+    // We add liquidity here
+    address public constant TRI_POOL =
+        0x960ea3e3C7FB317332d990873d354E18d7645590;
+    // Swap here
     address public constant UNISWAP_ROUTER =
         0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506;
 
+    // CRV Emissions sent to
     address public constant badgerTree =
-        0x2C798FaFd37C7DCdcAc2498e19432898Bc51376b;
+        0x635EB2C39C75954bb53Ebc011BDC6AfAAcE115A6;
+
+    // NOTE: Gauge can change, see setGauge
+    address public TRI_GAUGE; // Set in initialize
 
     function initialize(
         address _governance,
@@ -74,23 +82,47 @@ contract MyStrategy is BaseStrategy {
         performanceFeeStrategist = _feeConfig[1];
         withdrawalFee = _feeConfig[2];
 
+        // Gauge at time of deployment, can be changed via setGauge
+        TRI_GAUGE = 0x97E2768e8E73511cA874545DC5Ff8067eB19B787;
+
         /// @dev do one off approvals here
         IERC20Upgradeable(want).safeApprove(TRI_GAUGE, type(uint256).max);
-        IERC20Upgradeable(want).safeApprove(TRI_POOL, type(uint256).max);
         IERC20Upgradeable(reward).safeApprove(
             UNISWAP_ROUTER,
             type(uint256).max
+        );
+        IERC20Upgradeable(WBTC).safeApprove(TRI_POOL, type(uint256).max);
+    }
+
+    /// @dev Governance Set new Gauge Function
+    function setGauge(address newGauge) external {
+        _onlyGovernance();
+        // Withdraw from old gauge
+        ICurveGauge(TRI_GAUGE).withdraw(balanceOfPool());
+
+        // Remove approvals to old gauge
+        IERC20Upgradeable(want).safeApprove(TRI_GAUGE, 0);
+
+        // Set new gauge
+        TRI_GAUGE = newGauge;
+
+        // Add approvals to new gauge
+        IERC20Upgradeable(want).safeApprove(TRI_GAUGE, type(uint256).max);
+
+        // Deposit all in new gauge
+        ICurveGauge(TRI_GAUGE).deposit(
+            IERC20Upgradeable(want).balanceOf(address(this))
         );
     }
 
     /// ===== View Functions =====
 
-    // @dev Specify the name of the strategy
+    /// @dev Specify the name of the strategy
     function getName() external pure override returns (string memory) {
-        return "Arbitrum-Curve TriCrypto Strat";
+        return "triCrypto-Curve-Arbitrum-Rewards";
     }
 
-    // @dev Specify the version of the Strategy, for upgrades
+    /// @dev Specify the version of the Strategy, for upgrades
     function version() external pure returns (string memory) {
         return "1.0";
     }
@@ -105,6 +137,7 @@ contract MyStrategy is BaseStrategy {
         return true;
     }
 
+    // TODO: update lpcomponent
     // @dev These are the tokens that cannot be moved except by the vault
     function getProtectedTokens()
         public
@@ -112,22 +145,16 @@ contract MyStrategy is BaseStrategy {
         override
         returns (address[] memory)
     {
-        address[] memory protectedTokens = new address[](3);
+        address[] memory protectedTokens = new address[](5);
         protectedTokens[0] = want;
         protectedTokens[1] = lpComponent;
         protectedTokens[2] = reward;
-        protectedTokens[4] = WBTC;
+        protectedTokens[3] = WBTC;
+        protectedTokens[4] = TRI_GAUGE;
         return protectedTokens;
     }
 
-    /// ===== Permissioned Actions: Governance =====
-    /// @notice Delete if you don't need!
-    function setKeepReward(uint256 _setKeepReward) external {
-        _onlyGovernance();
-    }
-
     /// ===== Internal Core Implementations =====
-
     /// @dev security check to avoid moving tokens that would cause a rugpull, edit based on strat
     function _onlyNotProtectedTokens(address _asset) internal override {
         address[] memory protectedTokens = getProtectedTokens();
@@ -173,12 +200,14 @@ contract MyStrategy is BaseStrategy {
 
         uint256 _before = IERC20Upgradeable(want).balanceOf(address(this));
 
-        // Write your code here
+        // figure out and claim our rewards
         ICurveGauge(TRI_GAUGE).claim_rewards();
 
-        uint256 rewardsAmount =
-            IERC20Upgradeable(reward).balanceOf(address(this));
+        uint256 rewardsAmount = IERC20Upgradeable(reward).balanceOf(
+            address(this)
+        );
 
+        // If no reward, then no-op
         if (rewardsAmount == 0) {
             return 0;
         }
@@ -187,27 +216,30 @@ contract MyStrategy is BaseStrategy {
         uint256 sentToTree = rewardsAmount.mul(50).div(100);
         // Process CRV rewards if existing
         // Process fees on CRV Rewards
-        (uint256 governancePerformanceFee, uint256 strategistPerformanceFee) =
-            _processRewardsFees(sentToTree, reward);
+        (
+            uint256 governancePerformanceFee,
+            uint256 strategistPerformanceFee
+        ) = _processRewardsFees(sentToTree, reward);
 
-        uint256 afterFees =
-            sentToTree.sub(governancePerformanceFee).sub(
-                strategistPerformanceFee
-            );
+        uint256 afterFees = sentToTree.sub(governancePerformanceFee).sub(
+            strategistPerformanceFee
+        );
 
         // Transfer balance of CRV to the Badger Tree
         IERC20Upgradeable(reward).safeTransfer(badgerTree, afterFees);
         emit TreeDistribution(reward, afterFees, block.number, block.timestamp);
 
         // Now we swap
-        uint256 rewardsToReinvest =
-            IERC20Upgradeable(reward).balanceOf(address(this));
+        uint256 rewardsToReinvest = IERC20Upgradeable(reward).balanceOf(
+            address(this)
+        );
 
         // Swap CRV to wBTC and then LP into the pool
         address[] memory path = new address[](3);
         path[0] = reward;
         path[1] = WETH;
         path[2] = WBTC;
+        // Use wbtc + crv price feed to optimize swap
         IUniswapRouterV2(UNISWAP_ROUTER).swapExactTokensForTokens(
             rewardsToReinvest,
             0,
@@ -216,42 +248,31 @@ contract MyStrategy is BaseStrategy {
             now
         );
 
-        // Add liquidity for wBTC-renBTC pool by depositing wBTC
+        // Add liquidity for triCrypto pool by depositing wBTC
         ICurveStableSwap(TRI_POOL).add_liquidity(
             [0, IERC20Upgradeable(WBTC).balanceOf(address(this)), 0],
             0
         );
 
-        uint256 earned =
-            IERC20Upgradeable(want).balanceOf(address(this)).sub(_before);
+        uint256 earned = IERC20Upgradeable(want).balanceOf(address(this)).sub(
+            _before
+        );
 
-        // TODO: If you are harvesting a reward token you're not compounding
-        // You probably still want to capture fees for it
-        // // Process Sushi rewards if existing
-        // if (sushiAmount > 0) {
-        //     // Process fees on Sushi Rewards
-        //     // NOTE: Use this to receive fees on the reward token
-        //     _processRewardsFees(sushiAmount, SUSHI_TOKEN);
-
-        //     // Transfer balance of Sushi to the Badger Tree
-        //     // NOTE: Send reward to badgerTree
-        //     uint256 sushiBalance = IERC20Upgradeable(SUSHI_TOKEN).balanceOf(address(this));
-        //     IERC20Upgradeable(SUSHI_TOKEN).safeTransfer(badgerTree, sushiBalance);
-        //
-        //     // NOTE: Signal the amount of reward sent to the badger tree
-        //     emit TreeDistribution(SUSHI_TOKEN, sushiBalance, block.number, block.timestamp);
-        // }
+        /// @notice Keep this in so you get paid!
+        _processPerformanceFees(earned);
 
         /// @dev Harvest event that every strategy MUST have, see BaseStrategy
         emit Harvest(earned, block.number);
 
-        /// @dev Harvest must return the amount of want increased
+        _deposit(balanceOfWant());
+
         return earned;
     }
 
     /// @dev Rebalance, Compound or Pay off debt here
     function tend() external whenNotPaused {
         _onlyAuthorizedActors();
+
         if (balanceOfWant() > 0) {
             _deposit(balanceOfWant());
         }
@@ -283,22 +304,33 @@ contract MyStrategy is BaseStrategy {
     }
 
     /// @dev used to manage the governance and strategist fee on earned rewards, make sure to use it to get paid!
-    function _processRewardsFees(uint256 _amount, address _token)
+    function _processRewardsFees(uint256 _amount, address token)
         internal
         returns (uint256 governanceRewardsFee, uint256 strategistRewardsFee)
     {
         governanceRewardsFee = _processFee(
-            _token,
+            token,
             _amount,
             performanceFeeGovernance,
             IController(controller).rewards()
         );
 
         strategistRewardsFee = _processFee(
-            _token,
+            token,
             _amount,
             performanceFeeStrategist,
             strategist
         );
     }
+    
+    function _getWbtcRate()
+        internal
+        view
+        returns (int256)
+    {
+        int256 price =
+            AggregatorV2V3Interface(WBTC_PRICE_FEED).latestAnswer();
+        return price;
+    }
+    
 }

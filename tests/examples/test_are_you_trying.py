@@ -1,7 +1,6 @@
 from brownie import *
 from helpers.constants import MaxUint256
 
-
 def test_are_you_trying(deployer, sett, strategy, want):
     """
     Verifies that you set up the Strategy properly
@@ -38,9 +37,9 @@ def test_are_you_trying(deployer, sett, strategy, want):
 
     # Change to this if the strat is supposed to hodl and do nothing
     # assert strategy.balanceOf(want) = depositAmount
-
     ## TEST 2: Is the Harvest profitable?
     harvest = strategy.harvest({"from": deployer})
+
     event = harvest.events["Harvest"]
     # If it doesn't print, we don't want it
     assert event["harvested"] > 0
