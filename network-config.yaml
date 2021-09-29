@@ -4,7 +4,7 @@ live:
       - name: Mainnet (Infura)
         chainid: 42161
         id: arbitrum-main
-        host: https://arbitrum-mainnet.infura.io/v3/d164132aac0d4ade8230dc5c87eeae91
+        host: https://arbitrum-mainnet.infura.io/v3/
         explorer: https://api.arbiscan.io/api
         multicall2: "0x80C7DD17B01855a6D2347444a0FCC36136a314de"
       - name: Testnet

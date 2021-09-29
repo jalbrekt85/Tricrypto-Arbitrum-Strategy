@@ -34,15 +34,15 @@ contract MyStrategy is BaseStrategy {
     // address public want // Inherited from BaseStrategy, the token the strategy wants, swaps into and tries to grow
     address public lpComponent; // Token we provide liquidity with
     address public reward; // it's CRV
-
+    address public constant ZERO_ADDRESS = 0x0000000000000000000000000000000000000000;
     address public constant CRV = 0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978;
 
     // Used to swap from CRV to WBTC so we can provide liquidity
     address public constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address public constant WBTC = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
-    address public constant WBTC_PRICE_FEED = 0x6ce185860a4963106506C203335A2910413708e9;
-    address public constant CRV_PRICE_FEED;
-    uint256 public constant SLIPPAGE = 300 //3%
+    address public WBTC_PRICE_FEED;
+    address public CRV_PRICE_FEED;
+    uint256 public constant SLIPPAGE = 300; //3%
 
     // We add liquidity here
     address public constant TRI_POOL =
@@ -98,7 +98,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Governance Set new Gauge Function
     function setGauge(address newGauge) external {
-        _onlyGovernance();
+        _onlyGovernanceOrStrategist();
         // Withdraw from old gauge
         ICurveGauge(TRI_GAUGE).withdraw(balanceOfPool());
 
@@ -115,6 +115,12 @@ contract MyStrategy is BaseStrategy {
         ICurveGauge(TRI_GAUGE).deposit(
             IERC20Upgradeable(want).balanceOf(address(this))
         );
+    }
+
+    function setPriceFeeds(address wbtcFeed, address crvFeed) external {
+        _onlyGovernanceOrStrategist();
+        WBTC_PRICE_FEED = wbtcFeed;
+        CRV_PRICE_FEED = crvFeed;
     }
 
     /// ===== View Functions =====
@@ -136,7 +142,7 @@ contract MyStrategy is BaseStrategy {
 
     /// @dev Returns true if this strategy requires tending
     function isTendable() public view override returns (bool) {
-        return true;
+        return balanceOfWant() > 0;
     }
 
     // TODO: update lpcomponent
@@ -236,7 +242,15 @@ contract MyStrategy is BaseStrategy {
             address(this)
         );
 
-        minSwapAmount = _crvToWbtcRate(rewardsToReinvest);
+        uint256 minSwapAmount;
+        if (WBTC_PRICE_FEED == address(0) || CRV_PRICE_FEED == address(0)) {
+            minSwapAmount= 0;
+        }
+        else {
+            minSwapAmount = _crvToWbtcRate(rewardsToReinvest);
+        }
+        // Replace when Chainlink CRV feeds are available
+        // minSwapAmount = _crvToWbtcRate(rewardsToReinvest);
 
         // Swap CRV to wBTC and then LP into the pool
         address[] memory path = new address[](3);
@@ -333,7 +347,7 @@ contract MyStrategy is BaseStrategy {
         returns (uint256)
     {
         int256 wbtcRate = AggregatorV2V3Interface(WBTC_PRICE_FEED).latestAnswer();
-        int256 crvRate = AggregatorV2V3Interface(CRV_PRICE_FEED);
+        int256 crvRate = AggregatorV2V3Interface(CRV_PRICE_FEED).latestAnswer();
 
         // CRV per WBTC rate
         uint256 rate = ((amount * uint256(wbtcRate)) / uint256(crvRate)) / 10**10;

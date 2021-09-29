@@ -171,5 +171,5 @@ def strategyKeeper(strategy):
     return accounts.at(strategy.keeper(), force=True)
 
 @pytest.fixture(autouse=True)
-def isolation(fn_isolation):
+def isolation(module_isolation):
     pass

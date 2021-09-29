@@ -1,3 +1,28 @@
+## Arbitrum Tri-Crypto Strategy
+This strategy deposits wBTC on Arbitrum Tri-Crypto Pool and stakes the LP tokens to the Tri-Crypto guage to earn CRV rewards and trading fees. The strategy will periodically collect the CRV rewards, swap the CRV for wBTC to compound onto the pool and gauge. Chainlink price feed functionality to determine the optimal amount of wBTC to receive when swapping from CRV is implemented, but the CRV price feed is not yet available. When it is, `setPriceFeeds()` can be used to optimize swaps.
+
+## Performance
+
+* As of now, all of the yield in collected through CRV rewards at: 20.69% APY
+
+## NOTE: TO TEST
+Arbitrum fork doesn't work with hardhat out of the box right now (probably because of a JSON-RPC incompatibility with Arbitrum node). We'll test using our own fork of hardhat that circumvents this issue. 
+
+### Install Hardhat fork
+Clone my fork of hardhat repo somewhere
+```bash
+git clone git@github.com:shuklaayush/hardhat.git
+cd hardhat
+git checkout fix/arbitrum
+yarn build
+cd packages/hardhat-core
+yarn pack # Generate hardhat-v2.6.2.tgz
+``` 
+Clone this repo and install hardhat
+```bash
+git clone git@github.com:shuklaayush/WETH-Sushi-SLP-Arbitrum-Strategy.git
+yarn add -D <path-to-hardhat-pack-file>
+
 # Badger Strategy V1 Brownie Mix
 
 - Video Introduction: https://youtu.be/FVbhgPYW_D0
