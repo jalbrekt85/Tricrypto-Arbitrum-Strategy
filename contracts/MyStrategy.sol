@@ -41,6 +41,8 @@ contract MyStrategy is BaseStrategy {
     address public constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address public constant WBTC = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
     address public constant WBTC_PRICE_FEED = 0x6ce185860a4963106506C203335A2910413708e9;
+    address public constant CRV_PRICE_FEED;
+    uint256 public constant SLIPPAGE = 300 //3%
 
     // We add liquidity here
     address public constant TRI_POOL =
@@ -234,6 +236,8 @@ contract MyStrategy is BaseStrategy {
             address(this)
         );
 
+        minSwapAmount = _crvToWbtcRate(rewardsToReinvest);
+
         // Swap CRV to wBTC and then LP into the pool
         address[] memory path = new address[](3);
         path[0] = reward;
@@ -242,7 +246,7 @@ contract MyStrategy is BaseStrategy {
         // Use wbtc + crv price feed to optimize swap
         IUniswapRouterV2(UNISWAP_ROUTER).swapExactTokensForTokens(
             rewardsToReinvest,
-            0,
+            minSwapAmount,
             path,
             address(this),
             now
@@ -323,14 +327,18 @@ contract MyStrategy is BaseStrategy {
         );
     }
     
-    function _getWbtcRate()
+    function _crvToWbtcRate(uint256 amount)
         internal
         view
-        returns (int256)
+        returns (uint256)
     {
-        int256 price =
-            AggregatorV2V3Interface(WBTC_PRICE_FEED).latestAnswer();
-        return price;
+        int256 wbtcRate = AggregatorV2V3Interface(WBTC_PRICE_FEED).latestAnswer();
+        int256 crvRate = AggregatorV2V3Interface(CRV_PRICE_FEED);
+
+        // CRV per WBTC rate
+        uint256 rate = ((amount * uint256(wbtcRate)) / uint256(crvRate)) / 10**10;
+        // Account for slippage
+        return ((rate * 10000) - SLIPPAGE) / 10000;
     }
     
 }
